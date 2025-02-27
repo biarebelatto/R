@@ -1,0 +1,107 @@
+
+# Sankey Diagram with networkD3 (BETA - TOO MANY LINES)
+# Two nodes
+# JS text customization, color, alignment, value, style, position
+
+pacman::p_load(tidyverse, networkD3, htmlwidgets)
+options(scipen=999)
+
+# Data ---------------------------------------------------------------------------
+df <- read.csv('xxxxxxxx.csv') 
+
+df$class_2018 <- df$class_2018 %>%
+  gsub('Agropecuária', 'agropecuaria', .) %>%
+  gsub('Área Não Vegetada', 'nao_vegetada', .) %>%
+  gsub('Corpos Hídricos', 'corpos_hidricos', .) %>%
+  gsub('Formação Natural', 'formacao_natural', .) %>%
+  gsub('Não Observado', 'nao_observado', .) 
+df
+
+df$class_2023 <- df$class_2023 %>%
+  gsub('Agropecuária', 'agropecuaria', .) %>%
+  gsub('Área Não Vegetada', 'nao_vegetada', .) %>%
+  gsub('Corpos Hídricos', 'corpos_hidricos', .) %>%
+  gsub('Formação Natural', 'formacao_natural', .) %>%
+  gsub('Não Observado', 'nao_observado', .) 
+df
+
+df_long <- df 
+colnames(df_long) <- c('source', 'target', 'value')
+
+df_long$target <- paste(df_long$target, ' ', sep='')
+
+df_long$display_names <- df_long$target %>% 
+  gsub('formacao_natural', 'Formação Natural', .) %>%
+  gsub('agropecuaria', 'Agropecuária', .) %>%
+  gsub('nao_vegetada', 'Área Não Vegetada', .) %>%
+  gsub('corpos_hidricos', 'Corpos Hídricos', .) %>%
+  gsub('nao_observado', 'Não Observado', .)
+df_long
+
+nodes <- data.frame(name=c(as.character(df_long$source),
+                           as.character(df_long$target)) %>% unique())
+
+nodes$display_names <- nodes$name %>%
+  gsub('formacao_natural', 'Formação Natural', .) %>%
+  gsub('agropecuaria', 'Agropecuária', .) %>%
+  gsub('nao_vegetada', 'Área Não Vegetada', .) %>%
+  gsub('corpos_hidricos', 'Corpos Hídricos', .) %>%
+  gsub('nao_observado', 'Não Observado', .)
+nodes
+
+df_long$IDsource=match(df_long$source, nodes$name)-1
+df_long$IDtarget=match(df_long$target, nodes$name)-1
+
+unique(nodes$name) # Checagem
+unique(nodes$display_names) # Checagem
+
+nodes$display_names <- nodes$display_names %>%
+  gsub('Formação Natural ', 'Formação Natural', .) %>%
+  gsub('Agropecuária ', 'Agropecuária', .) %>%
+  gsub('Área Não Vegetada ', 'Área Não Vegetada', .) %>%
+  gsub('Corpos Hídricos ', 'Corpos Hídricos', .) %>%
+  gsub('Não Observado ', 'Não Observado', .)
+
+nodes$name <- nodes$name %>%
+  gsub('formacao_natural ', 'formacao_natural', .) %>%
+  gsub('agropecuaria ', 'agropecuaria', .) %>%
+  gsub('nao_vegetada ', 'nao_vegetada', .) %>%
+  gsub('corpos_hidricos ', 'corpos_hidricos', .) %>%
+  gsub('nao_observado ', 'nao_observado', .)
+nodes
+
+# Sankey Diagram ----------------------------------------------------------------------------------------
+
+my_color <- 'd3.scaleOrdinal() .domain(["formacao_natural", "agropecuaria", "nao_vegetada", "corpos_hidricos", "nao_observado"])                                      
+                                .range(["#44d444",          "#fade91",      "#d4271e",      "#37aef8",         "bababa"])'
+
+sankey <- sankeyNetwork(Links = df_long,
+              Nodes = nodes,
+              Source = 'IDsource',
+              Target = 'IDtarget',
+              Value = 'value',
+              NodeID = 'display_names',
+              sinksRight = FALSE,
+              fontSize = 12,
+              colourScale = my_color,
+              NodeGroup = 'name', nodePadding = 30)
+
+sankey <- htmlwidgets::onRender(sankey, '
+  function(el) {
+    d3.select(el).selectAll(".node text")
+      .attr("x", function(d) { return d.x < 50 ? -8 : 20; })  // Move para a esquerda
+      .attr("text-anchor", function(d) { return d.x < 50 ? "end" : "start"; }) // Alinha à esquerda
+      .style("font-weight", "bold")  // Deixa os rótulos em negrito
+      .each(function(d) {
+        d3.select(this)
+          .append("tspan")  // Adiciona um texto extra abaixo do rótulo do nó
+          .attr("x", d3.select(this).attr("x"))  // Mantém o alinhamento
+          .attr("dy", "1.5em")  // Move para baixo do rótulo original
+          .style("font-size", "12px")  // Define tamanho menor para os valores
+          .style("font-weight", "normal")  // Deixa os valores em fonte normal
+          .style("fill", "#555")  // Cor do texto (cinza escuro)
+          .text("(" + d.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ha)"); // Exibe o valor do fluxo
+      });
+  }
+')
+sankey
